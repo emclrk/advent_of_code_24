@@ -5,7 +5,7 @@ fn main() -> Result<(), advent_of_code::AdventOfCodeError> {
     let args: Vec<String> = env::args().collect();
     let process_name = args[0].clone();
     let config = Config::build(args).unwrap_or_else(|err| {
-        eprintln!("Problem parsing args: {:?}",err);
+        eprintln!("Problem parsing args: {:?}", err);
         eprintln!("Usage: {} DAY_NUM FNAME", process_name);
         std::process::exit(1);
     });

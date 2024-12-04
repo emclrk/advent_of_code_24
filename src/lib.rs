@@ -32,6 +32,7 @@ pub fn run(config: Config) -> Result<(), AdventOfCodeError> {
         1 => day1::run_day1(&config.fname),
         2 => day2::run_day2(&config.fname),
         3 => day3::run_day3(&config.fname),
+        4 => day4::run_day4(&config.fname),
         _ => Err(AdventOfCodeError::BadArgument(
             format! {"Day {} not yet implemented", config.day_num},
         )),
@@ -224,8 +225,7 @@ mod day3 {
                 if each_do.matches("don't()").count() > 0 {
                     new_lines.push(each_do.split("don't()").next().unwrap().to_string());
                     // any further don'ts don't matter
-                }
-                else {
+                } else {
                     new_lines.push(String::from(each_do));
                 }
             }
@@ -233,3 +233,64 @@ mod day3 {
         search_lines(&new_lines)
     }
 } // mod day3
+mod day4 {
+    use crate::get_lines;
+    use crate::AdventOfCodeError;
+    fn count_matches(lines: &Vec<String>) -> i32 {
+        lines.iter().fold(0, |acc, ss| {
+            acc + ss.matches("XMAS").count() + ss.matches("SAMX").count()
+        }) as i32
+    }
+    pub fn run_day4(fname: &String) -> Result<(), AdventOfCodeError> {
+        let lines: Vec<String> = get_lines(fname);
+        println!("p1: {}", xmas_puzzle(&lines));
+        println!("p2: {}", x_mas_puzzle(&lines));
+        Ok(())
+    }
+    fn xmas_puzzle(horz_lines: &Vec<String>) -> i32 {
+        let char_arr: Vec<Vec<char>> = horz_lines.iter().map(|s| s.chars().collect()).collect();
+        let num_rows = horz_lines.len();
+        let num_cols = horz_lines[0].len();
+        let mut vert_lines: Vec<String> = vec![String::new(); num_cols];
+        for row in char_arr.iter() {
+            for ii in 0..row.len() {
+                vert_lines[ii].push(row[ii]);
+            }
+        }
+        let num_diag = num_rows + num_cols - 1;
+        let mut frwd_diag_lines: Vec<String> = vec![String::new(); num_diag];
+        let mut bkwd_diag_lines: Vec<String> = vec![String::new(); num_diag];
+        for ii in 0..num_rows {
+            for jj in 0..num_cols {
+                frwd_diag_lines[ii + jj].push(char_arr[ii][jj]);
+                if jj >= ii {
+                    bkwd_diag_lines[jj - ii].push(char_arr[ii][jj]);
+                } else {
+                    bkwd_diag_lines[num_cols + ii - jj - 1].push(char_arr[ii][jj]);
+                }
+            }
+        }
+        count_matches(&horz_lines)
+            + count_matches(&vert_lines)
+            + count_matches(&bkwd_diag_lines)
+            + count_matches(&frwd_diag_lines)
+    }
+    fn x_mas_puzzle(lines: &Vec<String>) -> i32 {
+        let char_arr: Vec<Vec<char>> = lines.iter().map(|s| s.chars().collect()).collect();
+        let mut count_xs = 0;
+        for (ii, row) in char_arr.iter().enumerate() {
+            for (jj, el) in row.iter().enumerate() {
+                if ii > 0 && jj > 0 && ii < char_arr.len() - 1 && jj < row.len() - 1 && *el == 'A' {
+                    if (char_arr[ii - 1][jj - 1] == 'M' && char_arr[ii + 1][jj + 1] == 'S'
+                        || char_arr[ii - 1][jj - 1] == 'S' && char_arr[ii + 1][jj + 1] == 'M')
+                        && (char_arr[ii - 1][jj + 1] == 'M' && char_arr[ii + 1][jj - 1] == 'S'
+                            || char_arr[ii - 1][jj + 1] == 'S' && char_arr[ii + 1][jj - 1] == 'M')
+                    {
+                        count_xs += 1;
+                    }
+                }
+            } // iter over elements in row
+        } // iter over rows in array
+        count_xs
+    } // fn x_mas_puzzle
+} // mod day4

@@ -455,6 +455,7 @@ mod day5 {
 mod day6 {
     use crate::get_lines;
     use crate::AdventOfCodeError;
+    use std::collections::HashMap;
     pub fn run_day6(fname: &str) -> Result<(), AdventOfCodeError> {
         let lines = get_lines(fname);
         let char_arr_init: Vec<Vec<char>> = lines.iter().map(|s| s.chars().collect()).collect();
@@ -477,7 +478,6 @@ mod day6 {
                 break;
             }
         }
-        let mut num_checked = 0;
         for loc in visited_locs {
             if loc != init_guard_loc {
                 let mut test_char_arr = char_arr_init.clone();
@@ -486,9 +486,7 @@ mod day6 {
                     num_possible_loops += 1;
                 }
             }
-            num_checked += 1;
         }
-        println!("total checked {num_checked}");
         println!("part2: {num_possible_loops}");
         Ok(())
     }
@@ -502,7 +500,7 @@ mod day6 {
     }
     fn traverse(char_arr: &mut Vec<Vec<char>>) -> bool {
         let mut guard_loc: (i32, i32) = (0, 0);
-        let mut dir_arr = char_arr.clone();
+        let mut dir_arr :HashMap<(i32,i32),Vec<char>> = HashMap::new();
         let num_rows = char_arr.len();
         let num_cols = char_arr[0].len();
         while !off_grid(guard_loc, num_rows, num_cols) {
@@ -515,7 +513,7 @@ mod day6 {
             }
             let dir = char_arr[guard_loc.0 as usize][guard_loc.1 as usize];
             char_arr[guard_loc.0 as usize][guard_loc.1 as usize] = 'X';
-            dir_arr[guard_loc.0 as usize][guard_loc.1 as usize] = dir;
+            dir_arr.entry(guard_loc).and_modify(|ch| ch.push(dir)).or_insert(vec!{dir});
             let (new_loc, new_dir) = new_guard_loc(guard_loc, dir, char_arr);
             if off_grid(new_loc, num_rows, num_cols) {
                 // walked off the edge
@@ -523,9 +521,11 @@ mod day6 {
             }
             // if we didn't walk off the edge, check if we've hit a loop
             if char_arr[new_loc.0 as usize][new_loc.1 as usize] == 'X' {
-                if dir_arr[new_loc.0 as usize][new_loc.1 as usize] == new_dir {
+                if let Some(char_list) = dir_arr.get(&new_loc) {
+                    if let Some(_) = char_list.iter().find(|&c| *c == new_dir)  {
                     // been here before
                     return false;
+                    }
                 }
             }
             char_arr[new_loc.0 as usize][new_loc.1 as usize] = new_dir;

@@ -460,8 +460,27 @@ mod day6 {
         let lines = get_lines(fname);
         let char_arr_init: Vec<Vec<char>> = lines.iter().map(|s| s.chars().collect()).collect();
         let mut char_arr = char_arr_init.clone();
-        let part1 = find_num_pos(&mut char_arr);
-        println!("{part1}");
+        let mut init_guard_loc: (usize, usize) = (0, 0);
+        for (idx, row) in char_arr_init.iter().enumerate() {
+            if let Some(loc) = row.iter().position(|&c| is_guard(c)) {
+                init_guard_loc = (idx, loc);
+                break;
+            }
+        }
+        let init_guard_dir = char_arr_init[init_guard_loc.0][init_guard_loc.1];
+        println!("part1: {}", find_num_pos(&mut char_arr, init_guard_loc));
+        println!("part2: {}", find_num_loop_locs(&mut char_arr, init_guard_loc, init_guard_dir));
+        Ok(())
+    }  // run_day6
+    fn find_num_pos(char_arr: &mut Vec<Vec<char>>, init_guard_loc:(usize,usize)) -> i32 {
+        traverse(char_arr, init_guard_loc);
+        let final_str: String = char_arr
+            .iter()
+            .map(|s| s.iter().collect::<String>())
+            .collect::<String>();
+        final_str.matches("X").count().try_into().unwrap()
+    }
+    fn find_num_loop_locs(char_arr: &mut Vec<Vec<char>>, init_guard_loc:(usize,usize), init_guard_dir:char) -> i32 {
         let mut visited_locs = Vec::new();
         for (row_idx, row) in char_arr.iter().enumerate() {
             for (col_idx, cel) in row.iter().enumerate() {
@@ -470,47 +489,29 @@ mod day6 {
                 }
             }
         }
-        let mut num_possible_loops = 0;
-        let mut init_guard_loc: (usize, usize) = (0, 0);
-        for (idx, row) in char_arr_init.iter().enumerate() {
-            if let Some(loc) = row.iter().position(|&c| is_guard(c)) {
-                init_guard_loc = (idx, loc);
-                break;
+        let mut num_possible_loops:i32 = 0;
+        for loc in visited_locs.iter() {
+            // reset board to original state
+            for loc_1 in visited_locs.iter() {
+                char_arr[loc_1.0][loc_1.1] = '.'
             }
-        }
-        for loc in visited_locs {
-            if loc != init_guard_loc {
-                let mut test_char_arr = char_arr_init.clone();
-                test_char_arr[loc.0][loc.1] = 'O';
-                if !traverse(&mut test_char_arr) {
+            char_arr[init_guard_loc.0][init_guard_loc.1] = init_guard_dir;
+            if *loc != init_guard_loc {
+                char_arr[loc.0][loc.1] = 'O';
+                if !traverse(char_arr, init_guard_loc) {
                     num_possible_loops += 1;
                 }
             }
         }
-        println!("part2: {num_possible_loops}");
-        Ok(())
+        num_possible_loops
     }
-    fn find_num_pos(char_arr: &mut Vec<Vec<char>>) -> i32 {
-        traverse(char_arr);
-        let final_str: String = char_arr
-            .iter()
-            .map(|s| s.iter().collect::<String>())
-            .collect::<String>();
-        final_str.matches("X").count().try_into().unwrap()
-    }
-    fn traverse(char_arr: &mut Vec<Vec<char>>) -> bool {
-        let mut guard_loc: (i32, i32) = (0, 0);
+    fn traverse(char_arr: &mut Vec<Vec<char>>, init_guard_loc:(usize,usize)) -> bool {
         let mut dir_arr :HashMap<(i32,i32),Vec<char>> = HashMap::new();
         let num_rows = char_arr.len();
         let num_cols = char_arr[0].len();
+        let mut guard_loc :(i32,i32)= (init_guard_loc.0.try_into().unwrap(), init_guard_loc.1.try_into().unwrap());
         while !off_grid(guard_loc, num_rows, num_cols) {
             // find the guard
-            for (idx, row) in char_arr.iter().enumerate() {
-                if let Some(loc) = row.iter().position(|&c| is_guard(c)) {
-                    guard_loc = (idx.try_into().unwrap(), loc.try_into().unwrap());
-                    break;
-                }
-            }
             let dir = char_arr[guard_loc.0 as usize][guard_loc.1 as usize];
             char_arr[guard_loc.0 as usize][guard_loc.1 as usize] = 'X';
             dir_arr.entry(guard_loc).and_modify(|ch| ch.push(dir)).or_insert(vec!{dir});
@@ -584,7 +585,10 @@ mod day6 {
                     }
                 }
             }
-            _ => panic! {"bad direction!"},
+            _ =>  {
+                println!("{dir}");
+                panic! {"bad direction!"};
+            }
         };
         (new_loc, new_dir)
     }
@@ -609,15 +613,15 @@ mod day6 {
             .collect::<Vec<_>>();
         let char_arr_init: Vec<Vec<char>> = lines.iter().map(|s| s.chars().collect()).collect();
         let mut char_arr = char_arr_init.clone();
-        assert_eq!(find_num_pos(&mut char_arr), 41);
         let mut init_guard_loc: (usize, usize) = (0, 0);
-        let mut num_possible_loops = 0;
         for (idx, row) in char_arr_init.iter().enumerate() {
             if let Some(loc) = row.iter().position(|&c| is_guard(c)) {
                 init_guard_loc = (idx, loc);
                 break;
             }
         }
+        let init_guard_dir = char_arr_init[init_guard_loc.0][init_guard_loc.1];
+        assert_eq!(find_num_pos(&mut char_arr, init_guard_loc), 41);
         let mut visited_locs = Vec::new();
         for (row_idx, row) in char_arr.iter().enumerate() {
             for (col_idx, cel) in row.iter().enumerate() {
@@ -626,11 +630,18 @@ mod day6 {
                 }
             }
         }
-        for loc in visited_locs {
-            let mut test_char_arr = char_arr_init.clone();
-            if loc != init_guard_loc {
-                test_char_arr[loc.0][loc.1] = 'O';
-                if !traverse(&mut test_char_arr) {
+        // needed to be separate for borrowing reasons
+        let mut num_possible_loops = 0;
+        for loc in visited_locs.iter() {
+            // reset to original board state
+            for loc_1 in visited_locs.iter() {
+                char_arr[loc_1.0][loc_1.1] = '.'
+            }
+            char_arr[init_guard_loc.0][init_guard_loc.1] = init_guard_dir;
+            println!("{:?} {:?}", init_guard_dir, char_arr[init_guard_loc.0][init_guard_loc.1]);
+            if *loc != init_guard_loc {
+                char_arr[loc.0][loc.1] = 'O';
+                if !traverse(&mut char_arr, init_guard_loc) {
                     num_possible_loops += 1;
                 }
             }

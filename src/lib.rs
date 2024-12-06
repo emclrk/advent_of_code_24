@@ -34,6 +34,7 @@ pub fn run(config: Config) -> Result<(), AdventOfCodeError> {
         3 => day3::run_day3(&config.fname),
         4 => day4::run_day4(&config.fname),
         5 => day5::run_day5(&config.fname),
+        6 => day6::run_day6(&config.fname),
         _ => Err(AdventOfCodeError::BadArgument(
             format! {"Day {} not yet implemented", config.day_num},
         )),
@@ -298,7 +299,7 @@ mod day4 {
 mod day5 {
     use crate::get_lines;
     use crate::AdventOfCodeError;
-    use std::collections::HashMap;
+    // use std::collections::HashMap;
     pub fn run_day5(fname: &String) -> Result<(), AdventOfCodeError> {
         let lines: Vec<String> = get_lines(fname);
         let mut rules: Vec<(i32, i32)> = Vec::new();
@@ -390,6 +391,7 @@ mod day5 {
         }
         true
     }
+    /*
     fn build_priorities(rules: &Vec<(i32, i32)>) -> HashMap<i32, i32> {
         // BAD: takes an absurdly long time
         let mut priorities: HashMap<i32, i32> = HashMap::new();
@@ -448,4 +450,191 @@ mod day5 {
         }
         new_seq
     }
+    */
 } // mod day5
+mod day6 {
+    use crate::get_lines;
+    use crate::AdventOfCodeError;
+    pub fn run_day6(fname: &str) -> Result<(), AdventOfCodeError> {
+        let lines = get_lines(fname);
+        let char_arr_init: Vec<Vec<char>> = lines.iter().map(|s| s.chars().collect()).collect();
+        let mut char_arr = char_arr_init.clone();
+        let part1 = find_num_pos(&mut char_arr);
+        println!("{part1}");
+        let mut visited_locs = Vec::new();
+        for (row_idx, row) in char_arr.iter().enumerate() {
+            for (col_idx, cel) in row.iter().enumerate() {
+                if *cel == 'X' {
+                    visited_locs.push((row_idx, col_idx));
+                }
+            }
+        }
+        let mut num_possible_loops = 0;
+        let mut init_guard_loc: (usize, usize) = (0, 0);
+        for (idx, row) in char_arr_init.iter().enumerate() {
+            if let Some(loc) = row.iter().position(|&c| is_guard(c)) {
+                init_guard_loc = (idx, loc);
+                break;
+            }
+        }
+        let mut num_checked = 0;
+        for loc in visited_locs {
+            if loc != init_guard_loc {
+                let mut test_char_arr = char_arr_init.clone();
+                test_char_arr[loc.0][loc.1] = 'O';
+                if !traverse(&mut test_char_arr) {
+                    num_possible_loops += 1;
+                }
+            }
+            num_checked += 1;
+        }
+        println!("total checked {num_checked}");
+        println!("part2: {num_possible_loops}");
+        Ok(())
+    }
+    fn find_num_pos(char_arr: &mut Vec<Vec<char>>) -> i32 {
+        traverse(char_arr);
+        let final_str: String = char_arr
+            .iter()
+            .map(|s| s.iter().collect::<String>())
+            .collect::<String>();
+        final_str.matches("X").count().try_into().unwrap()
+    }
+    fn traverse(char_arr: &mut Vec<Vec<char>>) -> bool {
+        let mut guard_loc: (i32, i32) = (0, 0);
+        let mut dir_arr = char_arr.clone();
+        let num_rows = char_arr.len();
+        let num_cols = char_arr[0].len();
+        while !off_grid(guard_loc, num_rows, num_cols) {
+            // find the guard
+            for (idx, row) in char_arr.iter().enumerate() {
+                if let Some(loc) = row.iter().position(|&c| is_guard(c)) {
+                    guard_loc = (idx.try_into().unwrap(), loc.try_into().unwrap());
+                    break;
+                }
+            }
+            let dir = char_arr[guard_loc.0 as usize][guard_loc.1 as usize];
+            char_arr[guard_loc.0 as usize][guard_loc.1 as usize] = 'X';
+            dir_arr[guard_loc.0 as usize][guard_loc.1 as usize] = dir;
+            let (new_loc, new_dir) = new_guard_loc(guard_loc, dir, char_arr);
+            if off_grid(new_loc, num_rows, num_cols) {
+                // walked off the edge
+                return true;
+            }
+            // if we didn't walk off the edge, check if we've hit a loop
+            if char_arr[new_loc.0 as usize][new_loc.1 as usize] == 'X' {
+                if dir_arr[new_loc.0 as usize][new_loc.1 as usize] == new_dir {
+                    // been here before
+                    return false;
+                }
+            }
+            char_arr[new_loc.0 as usize][new_loc.1 as usize] = new_dir;
+            guard_loc = new_loc;
+        }
+        true
+    }
+    fn is_guard(sym: char) -> bool {
+        sym == 'v' || sym == '^' || sym == '<' || sym == '>'
+    }
+    fn new_guard_loc(loc: (i32, i32), dir: char, char_arr: &Vec<Vec<char>>) -> ((i32, i32), char) {
+        let mut new_loc: (i32, i32);
+        let mut new_dir: char = dir;
+        match dir {
+            'v' => {
+                new_loc = (loc.0 + 1, loc.1);
+                if !off_grid(new_loc, char_arr.len(), char_arr[0].len()) {
+                    if !(char_arr[new_loc.0 as usize][new_loc.1 as usize] == 'X'
+                        || char_arr[new_loc.0 as usize][new_loc.1 as usize] == '.')
+                    {
+                        new_loc = loc;
+                        new_dir = '<';
+                    }
+                }
+            }
+            '<' => {
+                new_loc = (loc.0, loc.1 - 1);
+                if !off_grid(new_loc, char_arr.len(), char_arr[0].len()) {
+                    if !(char_arr[new_loc.0 as usize][new_loc.1 as usize] == 'X'
+                        || char_arr[new_loc.0 as usize][new_loc.1 as usize] == '.')
+                    {
+                        new_loc = loc;
+                        new_dir = '^';
+                    }
+                }
+            }
+            '^' => {
+                new_loc = (loc.0 - 1, loc.1);
+                if !off_grid(new_loc, char_arr.len(), char_arr[0].len()) {
+                    if !(char_arr[new_loc.0 as usize][new_loc.1 as usize] == 'X'
+                        || char_arr[new_loc.0 as usize][new_loc.1 as usize] == '.')
+                    {
+                        new_loc = loc;
+                        new_dir = '>';
+                    }
+                }
+            }
+            '>' => {
+                new_loc = (loc.0, loc.1 + 1);
+                if !off_grid(new_loc, char_arr.len(), char_arr[0].len()) {
+                    if !(char_arr[new_loc.0 as usize][new_loc.1 as usize] == 'X'
+                        || char_arr[new_loc.0 as usize][new_loc.1 as usize] == '.')
+                    {
+                        new_loc = loc;
+                        new_dir = 'v';
+                    }
+                }
+            }
+            _ => panic! {"bad direction!"},
+        };
+        (new_loc, new_dir)
+    }
+    fn off_grid(loc: (i32, i32), row_len: usize, col_len: usize) -> bool {
+        loc.0 < 0 || loc.1 < 0 || loc.0 >= row_len as i32 || loc.1 >= col_len as i32
+    }
+    #[test]
+    fn run_day6_test() {
+        let test_input = "....#.....
+.........#
+..........
+..#.......
+.......#..
+..........
+.#..^.....
+........#.
+#.........
+......#...";
+        let lines = test_input
+            .lines()
+            .map(|s| String::from(s))
+            .collect::<Vec<_>>();
+        let char_arr_init: Vec<Vec<char>> = lines.iter().map(|s| s.chars().collect()).collect();
+        let mut char_arr = char_arr_init.clone();
+        assert_eq!(find_num_pos(&mut char_arr), 41);
+        let mut init_guard_loc: (usize, usize) = (0, 0);
+        let mut num_possible_loops = 0;
+        for (idx, row) in char_arr_init.iter().enumerate() {
+            if let Some(loc) = row.iter().position(|&c| is_guard(c)) {
+                init_guard_loc = (idx, loc);
+                break;
+            }
+        }
+        let mut visited_locs = Vec::new();
+        for (row_idx, row) in char_arr.iter().enumerate() {
+            for (col_idx, cel) in row.iter().enumerate() {
+                if *cel == 'X' {
+                    visited_locs.push((row_idx, col_idx));
+                }
+            }
+        }
+        for loc in visited_locs {
+            let mut test_char_arr = char_arr_init.clone();
+            if loc != init_guard_loc {
+                test_char_arr[loc.0][loc.1] = 'O';
+                if !traverse(&mut test_char_arr) {
+                    num_possible_loops += 1;
+                }
+            }
+        }
+        assert_eq!(num_possible_loops, 6);
+    }
+}

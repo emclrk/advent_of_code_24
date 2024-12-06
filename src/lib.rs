@@ -33,6 +33,7 @@ pub fn run(config: Config) -> Result<(), AdventOfCodeError> {
         2 => day2::run_day2(&config.fname),
         3 => day3::run_day3(&config.fname),
         4 => day4::run_day4(&config.fname),
+        5 => day5::run_day5(&config.fname),
         _ => Err(AdventOfCodeError::BadArgument(
             format! {"Day {} not yet implemented", config.day_num},
         )),
@@ -294,3 +295,157 @@ mod day4 {
         count_xs
     } // fn x_mas_puzzle
 } // mod day4
+mod day5 {
+    use crate::get_lines;
+    use crate::AdventOfCodeError;
+    use std::collections::HashMap;
+    pub fn run_day5(fname: &String) -> Result<(), AdventOfCodeError> {
+        let lines: Vec<String> = get_lines(fname);
+        let mut rules: Vec<(i32, i32)> = Vec::new();
+        let mut seqs: Vec<Vec<i32>> = Vec::new();
+        for line in lines {
+            if line.contains("|") {
+                let vals = line
+                    .split("|")
+                    .map(|v| v.parse::<i32>().unwrap())
+                    .collect::<Vec<_>>();
+                rules.push((vals[0], vals[1]));
+            } else if line.contains(",") {
+                // from line, create sequence containing the value and its index
+                seqs.push(
+                    line.split(",")
+                        .map(|v| v.parse::<i32>().unwrap())
+                        .collect::<Vec<_>>(),
+                );
+            }
+            // otherwise, it's probably a blank line
+        }
+        let mut total_passed = 0; // sum of middle values of correct sequences
+        let mut total_fixed = 0; // sum of middle values of correctED sequences
+                                 /*
+                                 let priorities = build_priorities(&rules);
+                                 let mut prior_vec = priorities
+                                     .iter()
+                                             .map(|(key, val)| (*key, *val))
+                                             .collect::<Vec<_>>();
+                                         prior_vec.sort_by(|(_, pri_a), (_, pri_b)| pri_b.cmp(pri_a));
+                                         for (first, sec) in rules.iter() {
+                                             let first_pri = prior_vec.iter().find(|(a, _)| *a == *first).unwrap();
+                                             let sec_pri = prior_vec.iter().find(|(a, _)| *a == *sec).unwrap();
+                                         }
+                                 */
+        for seq in seqs.iter() {
+            if seq.len() % 2 != 1 {
+                panic! {"guess my assumption didn't hold"};
+            }
+            if correctly_ordered(&seq, &rules) {
+                total_passed += seq[seq.len() / 2 as usize];
+            } else {
+                for el in seq.iter() {
+                    let mut num_lt = 0;
+                    let mut num_gt = 0;
+                    for other in seq.iter() {
+                        if *el == *other {
+                            continue;
+                        }
+                        if let Some(_) = rules
+                            .iter()
+                            .find(|(first, sec)| (*first, *sec) == (*el, *other))
+                        {
+                            num_lt += 1;
+                        } else if let Some(_) = rules
+                            .iter()
+                            .find(|(first, sec)| (*first, *sec) == (*other, *el))
+                        {
+                            num_gt += 1;
+                        } else {
+                            panic! {"thought all the rules would be there!"};
+                        }
+                    } // other in seq.iter
+                    if num_lt == num_gt {
+                        total_fixed += *el;
+                        break;
+                    }
+                } // for el in seq.iter()
+                  // new_seq is reordered version of seq
+                  // let prior_vec = build_mini_priorities(&rules, &seq);
+                  // let new_seq = build_seq(&seq, &prior_vec);
+                  // total_fixed += new_seq[new_seq.len() / 2 as usize];
+                  // fix the sequence to pass the rules...
+            }
+        }
+        println!("total of (passed) middle vals: {total_passed}");
+        println!("total of (fixed) middle vals: {total_fixed}");
+        Ok(())
+    }
+    fn correctly_ordered(seq: &Vec<i32>, rules: &Vec<(i32, i32)>) -> bool {
+        for (first, second) in rules.iter() {
+            if let Some((first_loc, _)) = seq.iter().enumerate().find(|(_, el)| *el == first) {
+                if let Some((sec_loc, _)) = seq.iter().enumerate().find(|(_, el)| *el == second) {
+                    if first_loc > sec_loc {
+                        return false;
+                    }
+                }
+            }
+        }
+        true
+    }
+    fn build_priorities(rules: &Vec<(i32, i32)>) -> HashMap<i32, i32> {
+        // BAD: takes an absurdly long time
+        let mut priorities: HashMap<i32, i32> = HashMap::new();
+        for (first, second) in rules.iter() {
+            priorities
+                .entry(*first)
+                .and_modify(|p| *p += 1)
+                .or_insert(1);
+            priorities.entry(*second).or_insert(0);
+            update_priorities(&mut priorities, &rules, *first, *second);
+            // want to iterate over all the rules we've already seen and update the priorities if needed
+        }
+        priorities
+    }
+    fn update_priorities(
+        priorities: &mut HashMap<i32, i32>,
+        rules: &Vec<(i32, i32)>,
+        current_a: i32,
+        current_b: i32,
+    ) {
+        let mut iter = rules.iter();
+        while let Some((a, b)) = iter.next() {
+            if (*a, *b) == (current_a, current_b) {
+                return;
+            }
+            if *b == current_a {
+                priorities.entry(*a).and_modify(|p| *p += 1);
+                update_priorities(priorities, rules, *a, *b);
+            }
+        }
+    }
+    fn build_mini_priorities(rules: &Vec<(i32, i32)>, seq: &Vec<i32>) -> Vec<(i32, i32)> {
+        // STILL BAD: takes less time, but still too long to be useful
+        let mut new_rules: Vec<(i32, i32)> = Vec::new();
+        for (first, sec) in rules.iter() {
+            if let Some(_) = seq.iter().find(|c| *c == first) {
+                if let Some(_) = seq.iter().find(|c| *c == first) {
+                    new_rules.push((*first, *sec));
+                }
+            }
+        }
+        let priorities = build_priorities(&rules);
+        let mut prior_vec = priorities
+            .iter()
+            .map(|(key, val)| (*key, *val))
+            .collect::<Vec<_>>();
+        prior_vec.sort_by(|(_, pri_a), (_, pri_b)| pri_b.cmp(pri_a));
+        prior_vec
+    }
+    fn build_seq(seq: &Vec<i32>, priorities: &Vec<(i32, i32)>) -> Vec<i32> {
+        let mut new_seq: Vec<i32> = Vec::new();
+        for (val, _) in priorities.iter() {
+            if let Some(_) = seq.iter().find(|c| *c == val) {
+                new_seq.push(*val);
+            }
+        }
+        new_seq
+    }
+} // mod day5

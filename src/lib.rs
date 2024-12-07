@@ -35,6 +35,7 @@ pub fn run(config: Config) -> Result<(), AdventOfCodeError> {
         4 => day4::run_day4(&config.fname),
         5 => day5::run_day5(&config.fname),
         6 => day6::run_day6(&config.fname),
+        7 => day7::run_day7(&config.fname),
         _ => Err(AdventOfCodeError::BadArgument(
             format! {"Day {} not yet implemented", config.day_num},
         )),
@@ -668,3 +669,125 @@ mod day6 {
         );
     }
 }
+mod day7 {
+    use crate::get_lines;
+    use crate::AdventOfCodeError;
+    use radix_fmt::radix;
+    pub fn run_day7(fname: &str) -> Result<(), AdventOfCodeError> {
+        let lines = get_lines(fname);
+        let mut equations: Vec<(u64, Vec<u64>)> = Vec::new();
+        for line in lines.iter() {
+            let sides: Vec<&str> = line.split(":").collect();
+            let (key, els) = (
+                sides[0].parse::<u64>().unwrap(),
+                sides[1]
+                    .trim()
+                    .split(" ")
+                    .map(|s| s.parse::<u64>().unwrap())
+                    .collect::<Vec<_>>(),
+            );
+            equations.push((key, els));
+        }
+        let part1 = total_calibration_result(&equations,2);
+        let part2 = total_calibration_result(&equations,3);
+        println!("p1: {:?}", part1);
+        println!("p2: {:?}", part2);
+        Ok(())
+    }
+    fn total_calibration_result(equations: &Vec<(u64, Vec<u64>)>, base:u8) -> (u128, u32) {
+        let mut total: u128 = 0;
+        let mut num_valid = 0;
+        for (result, equation) in equations.iter() {
+            if can_be_true(*result, equation,base) {
+                total += *result as u128;
+                num_valid += 1;
+            }
+        }
+        (total, num_valid)
+    }
+    fn can_be_true(test_val: u64, operands: &Vec<u64>, base:u8) -> bool {
+        let num_operators = operands.len();
+        let num_combos = (base as usize).pow(num_operators as u32) as usize;
+        for ii in 0..num_combos {
+            let mut itr = operands.iter();
+            let mut ans = *itr.next().unwrap();
+            let nary = format! {"{:0>num_operators$}", format!{"{}", radix(ii,base)}};
+            for (val, op) in itr.zip(nary.chars()) {
+                if op == '0' {
+                    ans += val;
+                } else if op == '1' {
+                    ans *= val;
+                } else if op == '2' {
+                    ans = format!{"{ans}{val}"}.parse::<u64>().unwrap();
+                } else {
+                    panic! {"whaaa?"};
+                }
+                if ans > test_val {
+                    break;
+                }
+            }
+            if ans == test_val {
+                return true;
+            }
+        } // cycle through possible combos of operators
+        false
+    }
+    #[test]
+    fn test_part1() {
+        let test_input = "190: 10 19
+3267: 81 40 27
+83: 17 5
+156: 15 6
+7290: 6 8 6 15
+161011: 16 10 13
+192: 17 8 14
+21037: 9 7 18 13
+292: 11 6 16 20";
+        let lines: Vec<String> = test_input.lines().map(|s| String::from(s)).collect();
+        let mut equations: Vec<(u64, Vec<u64>)> = vec!{};
+        for line in lines {
+            let sides: Vec<&str> = line.split(":").collect();
+            let (key, els) = (
+                sides[0].parse::<u64>().unwrap(),
+                sides[1]
+                    .trim()
+                    .split(" ")
+                    .map(|s| s.parse::<u64>().unwrap())
+                    .collect::<Vec<_>>(),
+            );
+            equations.push((key, els));
+        }
+        let (total, num_valid) = total_calibration_result(&equations, 2);
+        assert_eq!(total, 3749);
+        assert_eq!(num_valid, 3);
+    }
+    #[test]
+    fn test_part2() {
+        let test_input = "190: 10 19
+3267: 81 40 27
+83: 17 5
+156: 15 6
+7290: 6 8 6 15
+161011: 16 10 13
+192: 17 8 14
+21037: 9 7 18 13
+292: 11 6 16 20";
+        let lines: Vec<String> = test_input.lines().map(|s| String::from(s)).collect();
+        let mut equations: Vec<(u64, Vec<u64>)> = vec!{};
+        for line in lines {
+            let sides: Vec<&str> = line.split(":").collect();
+            let (key, els) = (
+                sides[0].parse::<u64>().unwrap(),
+                sides[1]
+                    .trim()
+                    .split(" ")
+                    .map(|s| s.parse::<u64>().unwrap())
+                    .collect::<Vec<_>>(),
+            );
+            equations.push((key, els));
+        }
+        let (total, num_valid) = total_calibration_result(&equations, 3);
+        assert_eq!(total, 11387);
+        assert_eq!(num_valid, 6);
+    }
+} // mod day7

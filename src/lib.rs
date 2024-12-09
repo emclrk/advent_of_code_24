@@ -36,6 +36,7 @@ pub fn run(config: Config) -> Result<(), AdventOfCodeError> {
         5 => day5::run_day5(&config.fname),
         6 => day6::run_day6(&config.fname),
         7 => day7::run_day7(&config.fname),
+        8 => day8::run_day8(&config.fname),
         _ => Err(AdventOfCodeError::BadArgument(
             format! {"Day {} not yet implemented", config.day_num},
         )),
@@ -668,7 +669,7 @@ mod day6 {
             6
         );
     }
-}
+} // mod day6
 mod day7 {
     use crate::get_lines;
     use crate::AdventOfCodeError;
@@ -688,24 +689,24 @@ mod day7 {
             );
             equations.push((key, els));
         }
-        let part1 = total_calibration_result(&equations,2);
-        let part2 = total_calibration_result(&equations,3);
+        let part1 = total_calibration_result(&equations, 2);
+        let part2 = total_calibration_result(&equations, 3);
         println!("p1: {:?}", part1);
         println!("p2: {:?}", part2);
         Ok(())
     }
-    fn total_calibration_result(equations: &Vec<(u64, Vec<u64>)>, base:u8) -> (u128, u32) {
+    fn total_calibration_result(equations: &Vec<(u64, Vec<u64>)>, base: u8) -> (u128, u32) {
         let mut total: u128 = 0;
         let mut num_valid = 0;
         for (result, equation) in equations.iter() {
-            if can_be_true(*result, equation,base) {
+            if can_be_true(*result, equation, base) {
                 total += *result as u128;
                 num_valid += 1;
             }
         }
         (total, num_valid)
     }
-    fn can_be_true(test_val: u64, operands: &Vec<u64>, base:u8) -> bool {
+    fn can_be_true(test_val: u64, operands: &Vec<u64>, base: u8) -> bool {
         let num_operators = operands.len();
         let num_combos = (base as usize).pow(num_operators as u32) as usize;
         for ii in 0..num_combos {
@@ -718,7 +719,7 @@ mod day7 {
                 } else if op == '1' {
                     ans *= val;
                 } else if op == '2' {
-                    ans = format!{"{ans}{val}"}.parse::<u64>().unwrap();
+                    ans = format! {"{ans}{val}"}.parse::<u64>().unwrap();
                 } else {
                     panic! {"whaaa?"};
                 }
@@ -744,7 +745,7 @@ mod day7 {
 21037: 9 7 18 13
 292: 11 6 16 20";
         let lines: Vec<String> = test_input.lines().map(|s| String::from(s)).collect();
-        let mut equations: Vec<(u64, Vec<u64>)> = vec!{};
+        let mut equations: Vec<(u64, Vec<u64>)> = vec![];
         for line in lines {
             let sides: Vec<&str> = line.split(":").collect();
             let (key, els) = (
@@ -773,7 +774,7 @@ mod day7 {
 21037: 9 7 18 13
 292: 11 6 16 20";
         let lines: Vec<String> = test_input.lines().map(|s| String::from(s)).collect();
-        let mut equations: Vec<(u64, Vec<u64>)> = vec!{};
+        let mut equations: Vec<(u64, Vec<u64>)> = vec![];
         for line in lines {
             let sides: Vec<&str> = line.split(":").collect();
             let (key, els) = (
@@ -791,3 +792,164 @@ mod day7 {
         assert_eq!(num_valid, 6);
     }
 } // mod day7
+mod day8 {
+    // type Num = i32;  // type alias - could be handy  // type alias - could be handy  // type
+    // alias - could be handy  // type alias - could be handy
+    use crate::get_lines;
+    use crate::AdventOfCodeError;
+    use std::collections::HashMap;
+    pub fn run_day8(fname: &str) -> Result<(), AdventOfCodeError> {
+        let lines = get_lines(fname);
+        let char_arr: Vec<Vec<char>> = lines.iter().map(|s| s.chars().collect()).collect();
+        let mut antenna_map: HashMap<char, Vec<(usize, usize)>> = HashMap::new();
+        for (ii, row) in char_arr.iter().enumerate() {
+            for (jj, &cell_val) in row.iter().enumerate() {
+                if cell_val != '.' {
+                    antenna_map
+                        .entry(cell_val)
+                        .and_modify(|v| {
+                            if let Some(_) = v.iter().find(|&&c| c == (ii, jj)) {
+                            } else {
+                                v.push((ii, jj));
+                            }
+                        })
+                        .or_insert(vec![(ii, jj)]);
+                }
+            }
+        }
+        let part1 = num_antinode_locs(&char_arr, &antenna_map, true);
+        let part2 = num_antinode_locs(&char_arr, &antenna_map, false);
+        println!("{part1}");
+        println!("{part2}");
+        Ok(())
+    }
+    // number of unique antinode locations
+    fn num_antinode_locs(
+        char_arr: &Vec<Vec<char>>,
+        antenna_map: &HashMap<char, Vec<(usize, usize)>>,
+        double_dist: bool,
+    ) -> usize {
+        // store locations of anodes
+        let (num_rows, num_cols) = (char_arr.len(), char_arr[0].len());
+        let mut anode_locs: Vec<(usize, usize)> = Vec::new();
+        for (_, locs) in antenna_map.iter() {
+            let mut loc_iter = locs.iter();
+            while let Some(first_loc) = loc_iter.next() {
+                for sec_loc in locs.iter() {
+                    if sec_loc == first_loc {
+                        continue;
+                    }
+                    let mut roc = (
+                        // rate of change
+                        first_loc.0 as i64 - sec_loc.0 as i64,
+                        first_loc.1 as i64 - sec_loc.1 as i64,
+                    );
+                    if roc.0 > 0 && roc.1 > 0 {
+                        let gcf = gcd(roc.0 as u64, roc.1 as u64) as i64;
+                        roc = (roc.0 / gcf, roc.1 / gcf);
+                    }
+                    let mut edge = (first_loc.0 as i64, first_loc.1 as i64);
+                    loop {
+                        let diff = (edge.0 - roc.0, edge.1 - roc.1);
+                        if diff.0 >= 0
+                            && diff.1 >= 0
+                            && diff.0 < num_rows.try_into().unwrap()
+                            && diff.1 < num_cols.try_into().unwrap()
+                        {
+                            edge = (edge.0 - roc.0, edge.1 - roc.1);
+                        } else {
+                            break;
+                        }
+                    }
+                    let mut test_locs: Vec<(usize, usize)> = Vec::new();
+                    let mut marker = edge;
+                    while marker.0 >= 0
+                        && marker.1 >= 0
+                        && (marker.0 as usize) < num_rows
+                        && (marker.1 as usize) < num_cols
+                    {
+                        // get distance from the two antennas
+                        if double_dist {
+                            let dist1 = dist(*first_loc, (marker.0 as usize, marker.1 as usize));
+                            let dist2 = dist(*sec_loc, (marker.0 as usize, marker.1 as usize));
+                            if dist1 == dist2 * 2.0 || dist1 * 2.0 == dist2 {
+                                test_locs.push((marker.0 as usize, marker.1 as usize));
+                            }
+                        } else {
+                            test_locs.push((marker.0 as usize, marker.1 as usize));
+                        }
+                        marker = (marker.0 + roc.0, marker.1 + roc.1);
+                    }
+                    for test_loc in test_locs.iter() {
+                        if anode_locs.iter().find(|&c| *c == *test_loc).is_none()
+                            && is_valid_loc(*test_loc, num_rows, num_cols)
+                        {
+                            // now check if one antenna is twice as far from potential antinode as the
+                            // other
+                            anode_locs.push(*test_loc);
+                        }
+                    }
+                }
+            }
+        } // iter over freq in antenna map
+        anode_locs.len()
+    }
+    fn dist(loc: (usize, usize), marker: (usize, usize)) -> f64 {
+        let p1 = (loc.0 as f64, loc.1 as f64);
+        let p2 = (marker.0 as f64, marker.1 as f64);
+        ((p1.0 - p2.0) * (p1.0 - p2.0) + (p1.1 - p2.1) * (p1.1 - p2.1)).sqrt()
+    }
+    // check if location exists on board
+    fn is_valid_loc(loc: (usize, usize), num_rows: usize, num_cols: usize) -> bool {
+        loc.0 <= num_rows && loc.1 <= num_cols
+    }
+    fn gcd(mut n: u64, mut m: u64) -> u64 {
+        // from victor-iyi on github
+        assert!(n != 0 && m != 0);
+        while m != 0 {
+            if m < n {
+                std::mem::swap(&mut m, &mut n);
+            }
+            m %= n;
+        }
+        n
+    }
+    #[test]
+    fn test_day8() {
+        let test_input = "............
+........0...
+.....0......
+.......0....
+....0.......
+......A.....
+............
+............
+........A...
+.........A..
+............
+............";
+        let lines = test_input
+            .lines()
+            .map(|s| String::from(s))
+            .collect::<Vec<_>>();
+        let char_arr: Vec<Vec<char>> = lines.iter().map(|s| s.chars().collect()).collect();
+        let mut antenna_map: HashMap<char, Vec<(usize, usize)>> = HashMap::new();
+        for (ii, row) in char_arr.iter().enumerate() {
+            for (jj, &cell_val) in row.iter().enumerate() {
+                if cell_val != '.' {
+                    antenna_map
+                        .entry(cell_val)
+                        .and_modify(|v| {
+                            if let Some(_) = v.iter().find(|&&c| c == (ii, jj)) {
+                            } else {
+                                v.push((ii, jj));
+                            }
+                        })
+                        .or_insert(vec![(ii, jj)]);
+                }
+            }
+        }
+        assert_eq!(num_antinode_locs(&char_arr, &antenna_map, true), 14);
+        assert_eq!(num_antinode_locs(&char_arr, &antenna_map, false), 34);
+    }
+}

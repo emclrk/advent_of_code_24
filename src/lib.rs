@@ -37,6 +37,7 @@ pub fn run(config: Config) -> Result<(), AdventOfCodeError> {
         6 => day6::run_day6(&config.fname),
         7 => day7::run_day7(&config.fname),
         8 => day8::run_day8(&config.fname),
+        9 => day9::run_day9(&config.fname),
         _ => Err(AdventOfCodeError::BadArgument(
             format! {"Day {} not yet implemented", config.day_num},
         )),
@@ -793,8 +794,7 @@ mod day7 {
     }
 } // mod day7
 mod day8 {
-    // type Num = i32;  // type alias - could be handy  // type alias - could be handy  // type
-    // alias - could be handy  // type alias - could be handy
+    // type Num = i32;  // type alias - could be handy
     use crate::get_lines;
     use crate::AdventOfCodeError;
     use std::collections::HashMap;
@@ -952,4 +952,143 @@ mod day8 {
         assert_eq!(num_antinode_locs(&char_arr, &antenna_map, true), 14);
         assert_eq!(num_antinode_locs(&char_arr, &antenna_map, false), 34);
     }
-}
+} // mod day8
+mod day9 {
+    use crate::fs;
+    use crate::AdventOfCodeError;
+    // use crate::get_lines;
+    pub fn run_day9(fname: &str) -> Result<(), AdventOfCodeError> {
+        let contents = &fs::read_to_string(fname).unwrap()[..];
+        let new_file_map_p1 = compact_file_blocks(contents.trim());
+        let new_file_map_p2 = compact_whole_files(contents.trim());
+        println!("p1: {}", checksum(new_file_map_p1));
+        println!("p2: {}", checksum(new_file_map_p2));
+        Ok(())
+    }
+    fn compact_file_blocks(file_map: &str) -> Vec<i64> {
+        let mut new_file_map: Vec<i64> = Vec::new();
+        let mut file_id: i64 = 0;
+        for (ii, val) in file_map.chars().enumerate() {
+            let val_num: usize = format! {"{val}"}
+                .parse::<usize>()
+                .expect("that should've worked");
+            if ii % 2 == 0 {
+                // it's a file
+                for _ in 0..val_num {
+                    new_file_map.push(file_id);
+                }
+                file_id += 1;
+            } else {
+                // it's a space
+                for _ in 0..val_num {
+                    new_file_map.push(-1);
+                }
+            }
+        }
+        let mut swapped_map: Vec<i64> = new_file_map
+            .clone()
+            .iter()
+            .map(|c| format! {"{c}"}.parse::<i64>().expect("this should be fine"))
+            .collect();
+        let max_idx = swapped_map.len() - 1;
+        for (ii, &el) in new_file_map.iter().collect::<Vec<_>>().iter().enumerate() {
+            if swapped_map[ii..].iter().find(|&a| *a > 0).is_none() {
+                // no more numbers after this point; we done
+                break;
+            }
+            if *el == -1 {
+                if let Some((idx, _)) = swapped_map.iter().rev().enumerate().find(|(_, &a)| a > 0) {
+                    if ii >= max_idx - idx {
+                        panic!("a bug!");
+                    }
+                    swapped_map.swap(ii, max_idx - idx);
+                }
+            }
+        }
+        swapped_map
+    }
+    fn compact_whole_files(file_map: &str) -> Vec<i64> {
+        let mut new_file_map: Vec<(i64, usize)> = Vec::new();
+        let mut file_id: i64 = 0;
+        for (ii, val) in file_map.chars().enumerate() {
+            let val_num: usize = format! {"{val}"}
+                .parse::<usize>()
+                .expect("that should've worked");
+            if ii % 2 == 0 {
+                // it's a file
+                new_file_map.push((file_id, val_num));
+                file_id += 1;
+            } else {
+                // it's a space
+                new_file_map.push((-1, val_num));
+            }
+        }
+        let mut swapped_map: Vec<(i64, usize)> = new_file_map.clone();
+        let file_blocks = new_file_map
+            .iter()
+            .rev()
+            .filter(|(f, _)| *f > 0)
+            .collect::<Vec<_>>();
+        for (blk_fid, blk_size) in file_blocks.iter() {
+            let swapped_copy = swapped_map.clone();
+            if let Some((idx, (_, _))) = swapped_copy
+                .iter()
+                .enumerate()
+                .find(|(_, (f, _))| f == blk_fid)
+            {
+                for (ii, (fid, space_size)) in swapped_copy.iter().enumerate() {
+                    if *fid != -1 {
+                        continue;
+                    }
+                    if ii >= idx {
+                        break;
+                    }
+                    if *space_size == *blk_size {
+                        swapped_map.swap(ii, idx);
+                        break;
+                    } else if *space_size > *blk_size {
+                        swapped_map[ii] = (*blk_fid, *blk_size);
+                        swapped_map[idx] = (-1, *blk_size);
+                        swapped_map.insert(ii + 1, (-1, space_size - blk_size));
+                        break;
+                    }
+                }
+            }
+        } // iterate over file blocks
+        let mut final_map: Vec<i64> = Vec::new();
+        for &(file_id, size) in swapped_map.iter() {
+            for _ in 0..size {
+                final_map.push(file_id);
+            }
+        }
+        final_map
+    }
+    fn checksum(file_map: Vec<i64>) -> i64 {
+        let mut checksum: i64 = 0;
+        for (pos, file_id) in file_map.iter().enumerate() {
+            if *file_id < 0 {
+                continue;
+            }
+            let file_id_val: i64 = format! {"{file_id}"}
+                .parse::<i64>()
+                .expect("parsing error in checksum (file id)");
+            let pos_val: i64 = format! {"{pos}"}
+                .parse::<i64>()
+                .expect("parsing error in checksum (position)");
+            checksum += file_id_val * pos_val;
+        }
+        checksum
+    }
+    #[test]
+    fn test_day9_p1() {
+        let test_input = "2333133121414131402";
+        let new_file_map = compact_file_blocks(test_input);
+        assert_eq!(checksum(new_file_map), 1928);
+    }
+    #[test]
+    fn test_day9_p2() {
+        let test_input = "2333133121414131402";
+        let new_file_map = compact_whole_files(test_input);
+        assert_eq!(checksum(new_file_map), 2858);
+    }
+} // mod day9

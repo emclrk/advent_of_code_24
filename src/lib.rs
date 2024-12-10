@@ -38,6 +38,7 @@ pub fn run(config: Config) -> Result<(), AdventOfCodeError> {
         7 => day7::run_day7(&config.fname),
         8 => day8::run_day8(&config.fname),
         9 => day9::run_day9(&config.fname),
+        10 => day10::run_day10(&config.fname),
         _ => Err(AdventOfCodeError::BadArgument(
             format! {"Day {} not yet implemented", config.day_num},
         )),
@@ -956,7 +957,6 @@ mod day8 {
 mod day9 {
     use crate::fs;
     use crate::AdventOfCodeError;
-    // use crate::get_lines;
     pub fn run_day9(fname: &str) -> Result<(), AdventOfCodeError> {
         let contents = &fs::read_to_string(fname).unwrap()[..];
         let new_file_map_p1 = compact_file_blocks(contents.trim());
@@ -969,9 +969,7 @@ mod day9 {
         let mut new_file_map: Vec<i64> = Vec::new();
         let mut file_id: i64 = 0;
         for (ii, val) in file_map.chars().enumerate() {
-            let val_num: usize = format! {"{val}"}
-                .parse::<usize>()
-                .expect("that should've worked");
+            let val_num: usize = val.to_digit(10).unwrap() as usize;
             if ii % 2 == 0 {
                 // it's a file
                 for _ in 0..val_num {
@@ -985,11 +983,7 @@ mod day9 {
                 }
             }
         }
-        let mut swapped_map: Vec<i64> = new_file_map
-            .clone()
-            .iter()
-            .map(|c| format! {"{c}"}.parse::<i64>().expect("this should be fine"))
-            .collect();
+        let mut swapped_map: Vec<i64> = new_file_map.clone();
         let max_idx = swapped_map.len() - 1;
         for (ii, &el) in new_file_map.iter().collect::<Vec<_>>().iter().enumerate() {
             if swapped_map[ii..].iter().find(|&a| *a > 0).is_none() {
@@ -1011,9 +1005,7 @@ mod day9 {
         let mut new_file_map: Vec<(i64, usize)> = Vec::new();
         let mut file_id: i64 = 0;
         for (ii, val) in file_map.chars().enumerate() {
-            let val_num: usize = format! {"{val}"}
-                .parse::<usize>()
-                .expect("that should've worked");
+            let val_num: usize = val.to_digit(10).unwrap() as usize;
             if ii % 2 == 0 {
                 // it's a file
                 new_file_map.push((file_id, val_num));
@@ -1069,13 +1061,8 @@ mod day9 {
             if *file_id < 0 {
                 continue;
             }
-            let file_id_val: i64 = format! {"{file_id}"}
-                .parse::<i64>()
-                .expect("parsing error in checksum (file id)");
-            let pos_val: i64 = format! {"{pos}"}
-                .parse::<i64>()
-                .expect("parsing error in checksum (position)");
-            checksum += file_id_val * pos_val;
+            let pos_val: i64 = pos.try_into().unwrap();
+            checksum += *file_id * pos_val;
         }
         checksum
     }
@@ -1092,3 +1079,191 @@ mod day9 {
         assert_eq!(checksum(new_file_map), 2858);
     }
 } // mod day9
+mod day10 {
+    use crate::get_lines;
+    use crate::AdventOfCodeError;
+    pub fn run_day10(fname: &str) -> Result<(), AdventOfCodeError> {
+        let lines = get_lines(fname);
+        let topo_map: Vec<Vec<usize>> = lines
+            .iter()
+            .map(|s| {
+                s.chars()
+                    .map(|c| c.to_digit(10).unwrap() as usize)
+                    .collect()
+            })
+            .collect();
+        let mut trailheads: Vec<(usize, usize)> = Vec::new();
+        for (row_idx, row) in topo_map.iter().enumerate() {
+            for (col_idx, cel) in row.iter().enumerate() {
+                if *cel == 0 {
+                    trailheads.push((row_idx, col_idx));
+                }
+            }
+        }
+        let p1 = total_score(&topo_map, &trailheads);
+        let p2 = total_rating(&topo_map, &trailheads);
+        println!("p1={p1}");
+        println!("p2={p2}");
+        Ok(())
+    }
+    fn total_score(topo_map: &Vec<Vec<usize>>, trailheads: &Vec<(usize, usize)>) -> usize {
+        // maybe we could use a fold for this, just for funsies?
+        let mut total = 0;
+        for trailhead in trailheads.iter() {
+            let v = find_path_score(topo_map, *trailhead);
+            let mut copy_vec: Vec<(usize, usize)> = Vec::new();
+            for loc in v.iter() {
+                if copy_vec
+                    .iter()
+                    .find(|(x, y)| *x == loc.0 && *y == loc.1)
+                    .is_none()
+                {
+                    copy_vec.push(*loc);
+                }
+            }
+            total += copy_vec.len();
+        }
+        total
+    }
+    fn find_path_score(
+        topo_map: &Vec<Vec<usize>>,
+        trailhead: (usize, usize),
+    ) -> Vec<(usize, usize)> {
+        let num_rows = topo_map.len();
+        let num_cols = topo_map[0].len();
+        let (r_idx, c_idx) = trailhead;
+        let current_val = topo_map[r_idx][c_idx];
+        if r_idx >= num_rows || c_idx >= num_cols {
+            vec![]
+        } else if topo_map[r_idx][c_idx] == 9 {
+            vec![(r_idx, c_idx)]
+        } else {
+            // check for steadily increasing
+            let mut ans: Vec<(usize, usize)> = Vec::new();
+            if r_idx > 0 && topo_map[r_idx - 1][c_idx] == (current_val + 1) {
+                let mut v = find_path_score(topo_map, (r_idx - 1, c_idx));
+                if !v.is_empty() {
+                    ans.append(&mut v);
+                }
+            }
+            if c_idx > 0 && topo_map[r_idx][c_idx - 1] == (current_val + 1) {
+                let mut v = find_path_score(topo_map, (r_idx, c_idx - 1));
+                if !v.is_empty() {
+                    ans.append(&mut v);
+                }
+            }
+            if r_idx < (num_rows - 1) && topo_map[r_idx + 1][c_idx] == (current_val + 1) {
+                let mut v = find_path_score(topo_map, (r_idx + 1, c_idx));
+                if !v.is_empty() {
+                    ans.append(&mut v);
+                }
+            }
+            if c_idx < (num_cols - 1) && topo_map[r_idx][c_idx + 1] == (current_val + 1) {
+                let mut v = find_path_score(topo_map, (r_idx, c_idx + 1));
+                if !v.is_empty() {
+                    ans.append(&mut v);
+                }
+            }
+            ans
+        }
+    }
+    fn find_path_rating(topo_map: &Vec<Vec<usize>>, trailhead: (usize, usize)) -> usize {
+        let num_rows = topo_map.len();
+        let num_cols = topo_map[0].len();
+        let (r_idx, c_idx) = trailhead;
+        let current_val = topo_map[r_idx][c_idx];
+        if r_idx >= num_rows || c_idx >= num_cols {
+            0
+        } else if topo_map[r_idx][c_idx] == 9 {
+            1
+        } else {
+            // check for steadily increasing
+            let mut ans: usize = 0;
+            if r_idx > 0 && topo_map[r_idx - 1][c_idx] == (current_val + 1) {
+                ans += find_path_rating(topo_map, (r_idx - 1, c_idx));
+            }
+            if c_idx > 0 && topo_map[r_idx][c_idx - 1] == (current_val + 1) {
+                ans += find_path_rating(topo_map, (r_idx, c_idx - 1));
+            }
+            if r_idx < (num_rows - 1) && topo_map[r_idx + 1][c_idx] == (current_val + 1) {
+                ans += find_path_rating(topo_map, (r_idx + 1, c_idx));
+            }
+            if c_idx < (num_cols - 1) && topo_map[r_idx][c_idx + 1] == (current_val + 1) {
+                ans += find_path_rating(topo_map, (r_idx, c_idx + 1));
+            }
+            ans
+        }
+    }
+    fn total_rating(topo_map: &Vec<Vec<usize>>, trailheads: &Vec<(usize, usize)>) -> usize {
+        // maybe we could use a fold for this, just for funsies?
+        let mut total = 0;
+        for trailhead in trailheads.iter() {
+            total += find_path_rating(topo_map, *trailhead);
+        }
+        total
+    }
+    #[test]
+    fn test_day10_p1() {
+        let test_input = "89010123
+78121874
+87430965
+96549874
+45678903
+32019012
+01329801
+10456732";
+        let lines = test_input
+            .lines()
+            .map(|s| String::from(s))
+            .collect::<Vec<_>>();
+        let topo_map: Vec<Vec<usize>> = lines
+            .iter()
+            .map(|s| {
+                s.chars()
+                    .map(|c| c.to_digit(10).unwrap() as usize)
+                    .collect()
+            })
+            .collect();
+        let mut trailheads: Vec<(usize, usize)> = Vec::new();
+        for (row_idx, row) in topo_map.iter().enumerate() {
+            for (col_idx, cel) in row.iter().enumerate() {
+                if *cel == 0 {
+                    trailheads.push((row_idx, col_idx));
+                }
+            }
+        }
+        assert_eq!(total_score(&topo_map, &trailheads), 36);
+    }
+    #[test]
+    fn test_day10_p2() {
+        let test_input = "89010123
+78121874
+87430965
+96549874
+45678903
+32019012
+01329801
+10456732";
+        let lines = test_input
+            .lines()
+            .map(|s| String::from(s))
+            .collect::<Vec<_>>();
+        let topo_map: Vec<Vec<usize>> = lines
+            .iter()
+            .map(|s| {
+                s.chars()
+                    .map(|c| c.to_digit(10).unwrap() as usize)
+                    .collect()
+            })
+            .collect();
+        let mut trailheads: Vec<(usize, usize)> = Vec::new();
+        for (row_idx, row) in topo_map.iter().enumerate() {
+            for (col_idx, cel) in row.iter().enumerate() {
+                if *cel == 0 {
+                    trailheads.push((row_idx, col_idx));
+                }
+            }
+        }
+        assert_eq!(total_rating(&topo_map, &trailheads), 81);
+    }
+} // mod day10

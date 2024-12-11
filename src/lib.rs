@@ -7,7 +7,7 @@ pub enum AdventOfCodeError {
 pub struct Config {
     day_num: i32,
     fname: String,
-    input_string:String,
+    input_string: String,
 }
 impl Config {
     pub fn build(args: Vec<String>) -> Result<Config, AdventOfCodeError> {
@@ -22,15 +22,14 @@ impl Config {
                 Ok(Config {
                     day_num: day_num,
                     fname: arg2,
-                    input_string:String::new(),
+                    input_string: String::new(),
                 })
-            }
-            else {
+            } else {
                 Ok(Config {
-                    day_num:day_num,
-                    fname:String::new(),
-                    input_string:arg2
-                        })
+                    day_num: day_num,
+                    fname: String::new(),
+                    input_string: arg2,
+                })
             }
         } else {
             Err(AdventOfCodeError::BadArgument(String::from(
@@ -1288,36 +1287,32 @@ mod day11 {
     type StoneNum = usize; // type alias - in case we overflow and need to change
     use crate::fs;
     use crate::AdventOfCodeError;
+    use std::collections::HashMap;
     pub fn run_day11(input: &str) -> Result<(), AdventOfCodeError> {
         let in_string = fs::read_to_string(input);
-        let contents :String;
+        let contents: String;
         if in_string.is_ok() {
-        contents = String::from(in_string.unwrap().trim());
-        }
-        else {
+            contents = String::from(in_string.unwrap().trim());
+        } else {
             contents = input.to_string();
         }
         let stones: Vec<StoneNum> = contents
             .split(" ")
             .map(|s| s.parse::<StoneNum>().unwrap())
             .collect();
-        // let p1 = blink(&stones, 25);
-        // println!("p1={p1}");
-        let p2 = blink(&stones, 48);
+        let p1 = blink(&stones, 25);
+        println!("p1={p1}");
+        let p2 = blink_182(&stones, 75);
         println!("p2={p2}");
         Ok(())
     }
     fn blink(stones: &Vec<StoneNum>, num_blinks: usize) -> usize {
-        let debug = false;
         let mut new_stones: Vec<StoneNum> = stones.clone();
         // let mut prev = new_stones.len();
-        for nn in 0..num_blinks {
-//             println!("{nn}: {} {} (0s:{})", new_stones.len(), new_stones.len() - prev, new_stones.iter().filter(|&s|*s==0).count());
-             println!("{nn}");
-            // prev = new_stones.len();
+        for _ in 0..num_blinks {
             // index, value
             let mut stones_to_insert: Vec<StoneNum> = Vec::new();
-            for (_, stone_num) in new_stones.iter_mut().enumerate() {
+            for stone_num in new_stones.iter_mut() {
                 if *stone_num == 0 {
                     *stone_num = 1;
                 } else if stone_num.to_string().len() % 2 == 0 {
@@ -1341,22 +1336,63 @@ mod day11 {
                     *stone_num *= 2024;
                 }
             }
-            for stone_num in stones_to_insert.iter() {
-                new_stones.insert(0, *stone_num);
-            }
-            if debug {
-                if new_stones.len() < 200 {
-                    println!(
-                        "{:?}",
-                        new_stones
-                            .iter()
-                            .map(|n| format! {"{n} "})
-                            .collect::<String>()
-                    );
-                }
+            for stone in stones_to_insert.iter() {
+                new_stones.insert(0, *stone);
             }
         } // ..num_blinks
         new_stones.len()
+    }
+    fn blink_182(stones: &Vec<StoneNum>, num_blinks: usize) -> usize {
+        let mut stone_counter: HashMap<StoneNum, StoneNum> = HashMap::new();
+        for stone in stones {
+            stone_counter
+                .entry(*stone)
+                .and_modify(|ct| *ct += 1)
+                .or_insert(1);
+        }
+        for _ in 0..num_blinks {
+            let mut updated_hashmap: HashMap<StoneNum, StoneNum> = HashMap::new();
+            for (key, stone_num) in stone_counter.iter() {
+                if *key == 0 {
+                    updated_hashmap
+                        .entry(1)
+                        .and_modify(|ct| *ct += *stone_num)
+                        .or_insert(*stone_num);
+                } else if key.to_string().len() % 2 == 0 {
+                    let split_num: Vec<char> = key.to_string().chars().collect();
+                    let num_digs = split_num.len() / 2;
+                    let (s1, s2): (StoneNum, StoneNum) = (
+                        split_num[..num_digs]
+                            .iter()
+                            .collect::<String>()
+                            .parse::<StoneNum>()
+                            .unwrap(),
+                        split_num[num_digs..]
+                            .iter()
+                            .collect::<String>()
+                            .parse::<StoneNum>()
+                            .unwrap(),
+                    );
+                    updated_hashmap
+                        .entry(s1)
+                        .and_modify(|ct| *ct += stone_num)
+                        .or_insert(*stone_num);
+                    updated_hashmap
+                        .entry(s2)
+                        .and_modify(|ct| *ct += stone_num)
+                        .or_insert(*stone_num);
+                } else {
+                    let key2024 = *key * 2024;
+                    updated_hashmap
+                        .entry(key2024)
+                        .and_modify(|ct| *ct += *stone_num)
+                        .or_insert(*stone_num);
+                }
+            }
+            stone_counter = updated_hashmap;
+            // println!("{:?} {}", stone_counter, stone_counter.iter().fold(0,|acc,kv|acc+*kv.1));
+        } // ..num_blinks
+        stone_counter.iter().fold(0, |acc, kv| acc + *kv.1)
     }
     #[test]
     fn test_day11_p1() {
@@ -1366,6 +1402,8 @@ mod day11 {
             .map(|s| s.parse::<StoneNum>().unwrap())
             .collect();
         assert_eq!(blink(&stones, 6), 22);
+        assert_eq!(blink_182(&stones, 6), 22);
         assert_eq!(blink(&stones, 25), 55312);
+        assert_eq!(blink_182(&stones, 25), 55312);
     }
 } // mod day11

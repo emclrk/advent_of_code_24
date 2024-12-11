@@ -7,6 +7,7 @@ pub enum AdventOfCodeError {
 pub struct Config {
     day_num: i32,
     fname: String,
+    input_string:String,
 }
 impl Config {
     pub fn build(args: Vec<String>) -> Result<Config, AdventOfCodeError> {
@@ -16,10 +17,21 @@ impl Config {
             )));
         }
         if let Ok(day_num) = args[1].parse::<i32>() {
-            Ok(Config {
-                day_num: day_num,
-                fname: args[2].clone(),
-            })
+            let arg2 = args[2].clone();
+            if fs::metadata(&arg2).is_ok() {
+                Ok(Config {
+                    day_num: day_num,
+                    fname: arg2,
+                    input_string:String::new(),
+                })
+            }
+            else {
+                Ok(Config {
+                    day_num:day_num,
+                    fname:String::new(),
+                    input_string:arg2
+                        })
+            }
         } else {
             Err(AdventOfCodeError::BadArgument(String::from(
                 "Parsing error",
@@ -28,18 +40,22 @@ impl Config {
     }
 }
 pub fn run(config: Config) -> Result<(), AdventOfCodeError> {
+    let mut input = config.input_string.clone();
+    if !config.fname.is_empty() {
+        input = config.fname.clone();
+    }
     match config.day_num {
-        1 => day1::run_day1(&config.fname),
-        2 => day2::run_day2(&config.fname),
-        3 => day3::run_day3(&config.fname),
-        4 => day4::run_day4(&config.fname),
-        5 => day5::run_day5(&config.fname),
-        6 => day6::run_day6(&config.fname),
-        7 => day7::run_day7(&config.fname),
-        8 => day8::run_day8(&config.fname),
-        9 => day9::run_day9(&config.fname),
-        10 => day10::run_day10(&config.fname),
-        11 => day11::run_day11(&config.fname),
+        1 => day1::run_day1(&input),
+        2 => day2::run_day2(&input),
+        3 => day3::run_day3(&input),
+        4 => day4::run_day4(&input),
+        5 => day5::run_day5(&input),
+        6 => day6::run_day6(&input),
+        7 => day7::run_day7(&input),
+        8 => day8::run_day8(&input),
+        9 => day9::run_day9(&input),
+        10 => day10::run_day10(&input),
+        11 => day11::run_day11(&input),
         _ => Err(AdventOfCodeError::BadArgument(
             format! {"Day {} not yet implemented", config.day_num},
         )),
@@ -1269,31 +1285,39 @@ mod day10 {
     }
 } // mod day10
 mod day11 {
-    type StoneNum = u128; // type alias - in case we overflow and need to change
+    type StoneNum = usize; // type alias - in case we overflow and need to change
     use crate::fs;
     use crate::AdventOfCodeError;
-    pub fn run_day11(fname: &str) -> Result<(), AdventOfCodeError> {
-        let contents = String::from(fs::read_to_string(fname).unwrap().trim());
+    pub fn run_day11(input: &str) -> Result<(), AdventOfCodeError> {
+        let in_string = fs::read_to_string(input);
+        let contents :String;
+        if in_string.is_ok() {
+        contents = String::from(in_string.unwrap().trim());
+        }
+        else {
+            contents = input.to_string();
+        }
         let stones: Vec<StoneNum> = contents
             .split(" ")
             .map(|s| s.parse::<StoneNum>().unwrap())
             .collect();
         // let p1 = blink(&stones, 25);
         // println!("p1={p1}");
-        let p2 = blink(&stones, 75);
+        let p2 = blink(&stones, 48);
         println!("p2={p2}");
         Ok(())
     }
     fn blink(stones: &Vec<StoneNum>, num_blinks: usize) -> usize {
         let debug = false;
         let mut new_stones: Vec<StoneNum> = stones.clone();
-        let mut prev = new_stones.len();
+        // let mut prev = new_stones.len();
         for nn in 0..num_blinks {
-            println!("{nn}: {} {} (0s:{})", new_stones.len(), new_stones.len() - prev, new_stones.iter().filter(|&s|*s==0).count());
-            prev = new_stones.len();
+//             println!("{nn}: {} {} (0s:{})", new_stones.len(), new_stones.len() - prev, new_stones.iter().filter(|&s|*s==0).count());
+             println!("{nn}");
+            // prev = new_stones.len();
             // index, value
-            let mut stones_to_insert: Vec<(usize, StoneNum)> = Vec::new();
-            for (ii, stone_num) in new_stones.iter_mut().enumerate() {
+            let mut stones_to_insert: Vec<StoneNum> = Vec::new();
+            for (_, stone_num) in new_stones.iter_mut().enumerate() {
                 if *stone_num == 0 {
                     *stone_num = 1;
                 } else if stone_num.to_string().len() % 2 == 0 {
@@ -1312,13 +1336,13 @@ mod day11 {
                             .unwrap(),
                     );
                     *stone_num = s1;
-                    stones_to_insert.push((ii + 1, s2));
+                    stones_to_insert.push(s2);
                 } else {
                     *stone_num *= 2024;
                 }
             }
-            for (ii, stone_num) in stones_to_insert.iter().rev() {
-                new_stones.insert(*ii, *stone_num);
+            for stone_num in stones_to_insert.iter() {
+                new_stones.insert(0, *stone_num);
             }
             if debug {
                 if new_stones.len() < 200 {

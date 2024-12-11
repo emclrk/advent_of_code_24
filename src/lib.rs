@@ -39,6 +39,7 @@ pub fn run(config: Config) -> Result<(), AdventOfCodeError> {
         8 => day8::run_day8(&config.fname),
         9 => day9::run_day9(&config.fname),
         10 => day10::run_day10(&config.fname),
+        11 => day11::run_day11(&config.fname),
         _ => Err(AdventOfCodeError::BadArgument(
             format! {"Day {} not yet implemented", config.day_num},
         )),
@@ -1267,3 +1268,80 @@ mod day10 {
         assert_eq!(total_rating(&topo_map, &trailheads), 81);
     }
 } // mod day10
+mod day11 {
+    type StoneNum = u128; // type alias - in case we overflow and need to change
+    use crate::fs;
+    use crate::AdventOfCodeError;
+    pub fn run_day11(fname: &str) -> Result<(), AdventOfCodeError> {
+        let contents = String::from(fs::read_to_string(fname).unwrap().trim());
+        let stones: Vec<StoneNum> = contents
+            .split(" ")
+            .map(|s| s.parse::<StoneNum>().unwrap())
+            .collect();
+        // let p1 = blink(&stones, 25);
+        // println!("p1={p1}");
+        let p2 = blink(&stones, 75);
+        println!("p2={p2}");
+        Ok(())
+    }
+    fn blink(stones: &Vec<StoneNum>, num_blinks: usize) -> usize {
+        let debug = false;
+        let mut new_stones: Vec<StoneNum> = stones.clone();
+        let mut prev = new_stones.len();
+        for nn in 0..num_blinks {
+            println!("{nn}: {} {} (0s:{})", new_stones.len(), new_stones.len() - prev, new_stones.iter().filter(|&s|*s==0).count());
+            prev = new_stones.len();
+            // index, value
+            let mut stones_to_insert: Vec<(usize, StoneNum)> = Vec::new();
+            for (ii, stone_num) in new_stones.iter_mut().enumerate() {
+                if *stone_num == 0 {
+                    *stone_num = 1;
+                } else if stone_num.to_string().len() % 2 == 0 {
+                    let split_num: Vec<char> = stone_num.to_string().chars().collect();
+                    let num_digs = split_num.len() / 2;
+                    let (s1, s2): (StoneNum, StoneNum) = (
+                        split_num[..num_digs]
+                            .iter()
+                            .collect::<String>()
+                            .parse::<StoneNum>()
+                            .unwrap(),
+                        split_num[num_digs..]
+                            .iter()
+                            .collect::<String>()
+                            .parse::<StoneNum>()
+                            .unwrap(),
+                    );
+                    *stone_num = s1;
+                    stones_to_insert.push((ii + 1, s2));
+                } else {
+                    *stone_num *= 2024;
+                }
+            }
+            for (ii, stone_num) in stones_to_insert.iter().rev() {
+                new_stones.insert(*ii, *stone_num);
+            }
+            if debug {
+                if new_stones.len() < 200 {
+                    println!(
+                        "{:?}",
+                        new_stones
+                            .iter()
+                            .map(|n| format! {"{n} "})
+                            .collect::<String>()
+                    );
+                }
+            }
+        } // ..num_blinks
+        new_stones.len()
+    }
+    #[test]
+    fn test_day11_p1() {
+        let test_input = String::from("125 17");
+        let stones: Vec<StoneNum> = test_input
+            .split(" ")
+            .map(|s| s.parse::<StoneNum>().unwrap())
+            .collect();
+        assert_eq!(blink(&stones, 6), 22);
+        assert_eq!(blink(&stones, 25), 55312);
+    }
+} // mod day11
